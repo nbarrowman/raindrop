@@ -1,0 +1,100 @@
+---
+title: "Raindrop plots"
+author: "Nick Barrowman"
+date: '`r strftime(Sys.time(),format="%d-%b-%Y at %H:%M")`'
+output:
+  rmarkdown::html_vignette:
+    css: raindropVignette.css
+    toc: true
+    toc_depth: '2'
+vignette: >
+  %\VignetteIndexEntry{Introduction to vtree}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo=FALSE}
+library(raindrop)
+```
+
+```{r, echo=FALSE}
+PNGdir <- tempdir()
+```
+
+# Introduction
+
+```{r}
+studies <- data.frame(
+  trial=c(1,1),x=c(1,15),n=c(11,25),rx=c(1,0))
+study1fit <- glm(cbind(x,n-x)~rx,family=binomial,
+  data=studies[studies$trial==1,])
+theta <- seq(-8,1,length=200)
+maxloglik <- study1fit$deviance/-2
+loglik <- rep(NA,length(theta))
+for (i in 1:length(theta)) {
+  fit <- update(study1fit,~. -rx + offset(theta[i]*rx))
+  loglik[i] <- fit$deviance/-2 
+}
+```
+
+```{r}
+plot(theta,loglik-maxloglik,type="l",ylim=c(-5,0))
+
+condloglik <- log(clik(theta,1,10,15,10))
+maxcondloglik <- max(condloglik)
+
+l <- condloglik-maxcondloglik
+ldlmax <- theta[order(-l)[1]]
+above <- l > -1.92
+thickness <- 1.92*(1+l/1.92)
+thickness[thickness<0] <- 0
+lines(theta,condloglik-maxcondloglik)
+polygon(c(theta,rev(theta)),c(-1.92-thickness,rev(-1.92+thickness)),
+  border=F,col=grey(0.79))
+
+lines(theta,l,lwd=3)
+abline(h=-1.92)
+lines(theta[above],-1.92*2-l[above],lty=5)
+abline(v=ldlmax,lty=3)
+
+lines(theta,loglik-maxloglik,col=2,lwd=3)
+
+table <- summary(study1fit)$coef
+mlelogOR <- table["rx","Estimate"] 
+ASElogOR <- table["rx","Std. Error"]
+quadloglik <- -0.5*(theta-mlelogOR)^2/ASElogOR^2
+lines(theta,quadloglik,col=3,lwd=3)
+abline(v=mlelogOR,lty=3,lwd=3)
+```
+
+```{r}
+par(mar=c(4.5,6,3,2))
+par(las=1)
+par(cex=1.5)
+plot(theta,condloglik-maxcondloglik,type="n",ylim=c(-5,0),
+  xlab="Log odds ratio",ylab="")
+lines(theta,quadloglik,col=3,lwd=3)
+abline(v=mlelogOR,lty=3,lwd=3)
+
+abline(h=-1.9208)
+abline(v=mlelogOR-1.96*ASElogOR,col=5)
+abline(v=mlelogOR+1.96*ASElogOR,col=5)
+```
+
+```{r}
+plot(theta,condloglik-maxcondloglik,type="n",ylim=c(-5,0),
+  xlab="Log odds ratio",ylab="")
+thickWald <- 1.92*(1+quadloglik/1.92); thickWald[thickWald<0] <- 0
+polygon(c(theta,rev(theta)),c(-1.92-thickWald,rev(-1.92+thickWald)),
+  border=F,col=grey(0.79))
+lines(theta,quadloglik,col=3,lwd=3)
+abline(v=mlelogOR,lty=3,lwd=3)
+abline(h=-1.9208)
+
+plot(theta,condloglik-maxcondloglik,type="n",ylim=c(-5,0),
+  xlab="Log odds ratio",ylab="")
+lines(theta,condloglik-maxcondloglik,lwd=3,col=7)
+
+plotraindrops(list("Wald"=quadloglik,"Conditional"=condloglik),theta)
+```
+
